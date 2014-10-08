@@ -1,0 +1,398 @@
+OCAMLPACKS=bytes bigarray
+OCAMLFLAGS+= -g
+
+if $(lt $(OCAMLC_VERSION_MAJOR),4)
+	pa_pipe.cmo.created: # to disable all magic done by omake
+		ocamlfind ocamlc -package camlp4 -pp camlp4orf -c pa_pipe.ml
+		touch $@
+	.SCANNER: scan-ocaml-%: pa_pipe.cmo.created
+	clean::
+		rm -f pa_pipe.c*
+	OCAMLFINDFLAGS+= -syntax camlp4o -ppopt -I -ppopt . -ppopt pa_pipe.cmo
+	OCAMLPACKS+= camlp4
+	export
+
+.PHONY: autoconf
+autoconf: configure.ac
+	autoconf
+
+if $(equal $(OSTYPE),Win32)
+	config.h: config.h.in #configure
+		bash.exe configure "CC=$(OCAMLC_CC) $(OCAMLC_CC_CFLAGS)"
+else
+	config.h: config.h.in #configure
+		./configure "CC=$(OCAMLC_CC) $(OCAMLC_CC_CFLAGS)"
+
+clean::
+	rm -f config.log
+
+.SCANNER: scan-c-%: config.h
+
+Create_c_inc(digest,size,sph_name)=
+	file=cinc_$(digest).inc
+	if $(file-exists $(file))
+		chmod(0644 $(file))
+	stdout = $(fopen $(file), w)
+	fsubst(hl_inc.c)
+	case $"@DIGEST@" g
+			value $(uppercase $(digest))
+	case $"@Digest@" g
+			value $(capitalize $(digest))
+	case $"@digest@" g
+			value $(digest)
+	case $"@size@" g
+			value $(size)
+	case $"@sph_name@" g
+			value $(sph_name)
+	close($(stdout))
+	if $(not $(equal $(OSTYPE), Win32))
+		chmod(0444 $(file))
+
+Create_c(name,includes,sph_file)=
+	if $(file-exists $(name))
+		chmod(0644 $(name))
+	stdout = $(fopen $(name), w)
+	fsubst(hl_inc_head.c)
+	case $"@include@" g
+			value $(sph_file)
+	flush($(stdout))
+	#close($(stdout))
+	#fd=$(fopen $(name), a)
+	fprintln($(stdout),$(EMPTY))
+	includes.foreach(x)
+		fprintln($(stdout),\#include "$(x)")
+	#flush($(stdout))
+	close($(stdout))
+	if $(not $(equal $(OSTYPE), Win32))
+		chmod(0444 $(name))
+
+Create_c_files(M)=
+	sph_file=$(M.find sph_file)
+	rname=$(addprefix c_, $(M.find lib_name))
+	name=$(addsuffix .c, $(rname))
+	digests=$(M.find digests)
+	includes=$(addsuffix .inc, $(addprefix cinc_, $(digests.keys)))
+	digests.foreach(dig,size)
+		sph_name=
+			try
+				x=$(M.find sph_digest)
+				value $(x.find $(dig))
+			default
+				value $(dig)
+		cinc_$(dig).inc: hl_inc_head.c hl_inc.c
+			Create_c_inc($(dig),$(size),$(sph_name))
+		clean::
+			rm -f cinc_$(dig).inc
+	$(name): $(includes) hl_inc_head.c hl_inc.c
+		Create_c($(name),$(includes),$(sph_file))
+	clean::
+		rm -f $(name)
+	return $(rname)
+
+Create_ml(file,digest,size,template)=
+	if $(file-exists $(file))
+		chmod(0644 $(file))
+	stdout=$(fopen $(file),w)
+	fsubst($(template))
+	case $"@DIGEST@" g
+			value $(uppercase $(digest))
+	case $"@Digest@" g
+			value $(capitalize $(digest))
+	case $"@digest@" g
+			value $(digest)
+	case $"@size@" g
+			value $(size)
+	close($(stdout))
+	if $(not $(equal $(OSTYPE), Win32))
+		chmod(0444 $(file))
+
+
+Create_ml_files(M)=
+	digests=$(M.find digests)
+	rnames=$(addprefix cryptohash_, $(digests.keys))
+	digests.foreach(dig,size)
+		cryptohash_$(dig).ml: hashlib_common.inc.ml hashlib_common.inc.mli
+			Create_ml($@,$(dig),$(size),$<)
+		cryptohash_$(dig).mli: hashlib_common.inc.mli
+			Create_ml($@,$(dig),$(size), $<)
+		clean::
+			rm -f cryptohash_$(dig).mli cryptohash_$(dig).ml
+	return $(rnames)
+
+
+ALL_OBJECTS[]=
+ALL_LIBS[]=
+MLI_FILES[]=
+META_PARTS[]=
+META_LIBS[]=
+
+Create_meta_part(M)=
+	section
+		lib=$(M.find lib_name)
+		meta_name=$(string META.$(lib))
+		name=$(PROJNAME)_$(lib)
+		digests=$(M.find digests)
+		digests=$(digests.keys)
+		ndigests[]=
+		foreach(x,$(digests))
+			export ndigests
+			ndigests=$(array $(ndigests) $(String_subst $'_', $'-', $(x)))
+		digests=$(ndigests)
+		#the following doesn't work on omake 0.98.5
+		#digests=$(digests.map $(fun x => $(String_subst $'_', $'-', $(x))))
+		first_pkg=$(digests.nth 0)
+		$(meta_name):
+			section
+				fd=$(fopen $(meta_name), w)
+				first=$(EMPTY)
+				digests.foreach(dig)
+					export first
+					fprintln($(fd),$'package "'$(dig)$'" (')
+					fprintln($(fd),$'  version="'$(VERSION)\")
+					if $(equal $(first),$(EMPTY))
+						export first
+						first=$(dig)
+						fprintln($(fd),$'  archive(byte) = "'$(name)$'.cma"')
+						fprintln($(fd),$'  archive(byte, plugin) = "'$(name)$'.cma"')
+						fprintln($(fd),$'  archive(native) = "'$(name)$'.cmxa"')
+						fprintln($(fd),$'  archive(native, plugin) = "'$(name)$'.cmxs"')
+						fprintln($(fd),$'  requires = "bytes"')
+					else
+						fprintln($(fd),$'  requires = "'$(PROJNAME).$(first)$'"')
+					fprintln($(fd),$'  exists_if = "'$(name)$'.cma"')
+					fprintln($(fd),$')')
+					fprintln($(fd),$(EMPTY))
+				close($(fd))
+		clean::
+			rm -f $(meta_name)
+		export first_pkg meta_name
+	return $(array $(meta_name) $(first_pkg))
+
+Create_binding(M)=
+	export ALL_OBJECTS ALL_LIBS MLI_FILES META_PARTS META_LIBS
+	section
+		export ALL_OBJECTS ALL_LIBS MLI_FILES META_PARTS META_LIBS
+		ml_files=$(Create_ml_files $(M))
+		n=$(Create_meta_part $(M))
+		#META_PARTS=$(array $(Create_meta_part $(M)) $(META_PARTS))
+		#META_PARTS+= $(n.nth 0)
+		#META_LIBS+= $(n.nth 1)
+		c_files=$(Create_c_files $(M))
+		libname=$(M.find lib_name)
+		CFLAGS_ADD=
+			if $(or $(equal $(OCAMLC_SYSTEM),win32),$(equal $(OCAMLC_SYSTEM), win64))
+				value /O2
+			else
+				value -Wno-unused-function -O3 #3 -g
+		CFLAGS+= $(CFLAGS_ADD)
+		Repeat_targets($(ml_files))
+		nobjs=$(MixedLibrary cryptohash_$(libname),$(ml_files),$(c_files))
+		ALL_OBJECTS=$(array $(ALL_OBJECTS) $(nobjs))
+		ALL_LIBS=$(array $(ALL_LIBS) cryptohash_$(libname))
+		MLI_FILES=$(array $(MLI_FILES) $(addsuffix .mli,$(ml_files)))
+		#META_PARTS=$(array $(META_PARTS) $(n.nth 0))
+		META_PARTS+=$(n.nth 0)
+		META_LIBS[]=$(array $(n.nth 1) $(META_LIBS))
+
+section
+	export ALL_OBJECTS ALL_LIBS MLI_FILES META_PARTS META_LIBS
+	M.=
+		extends $(Map)
+		D.=
+			extends $(Map)
+			$|sha224| = 28
+			$|sha256| = 32
+		$|digests|= $(D)
+		$|sph_file| = sph_sha2.c
+		$|lib_name| = sha2small
+	Create_binding($(M))
+
+section
+	export ALL_OBJECTS ALL_LIBS MLI_FILES META_PARTS META_LIBS
+	M.=
+		extends $(Map)
+		D.=
+			extends $(Map)
+			$|sha384| = 48
+			$|sha512| = 64
+		$|digests| = $(D)
+		$|sph_file| = sph_sha2big.c
+		$|lib_name| = sha2big
+	Create_binding($(M))
+
+section
+	export ALL_OBJECTS ALL_LIBS MLI_FILES META_PARTS META_LIBS
+	M.=
+		extends $(Map)
+		D.=
+			extends $(Map)
+			$|sha3_224| = 28
+			$|sha3_256| = 32
+			$|sha3_384| = 48
+			$|sha3_512| = 64
+		$|digests|= $(D)
+		S.=
+			extends $(Map)
+			$|sha3_224| = keccak224
+			$|sha3_256| = keccak256
+			$|sha3_384| = keccak384
+			$|sha3_512| = keccak512
+		$|sph_digest| = $(S)
+		$|sph_file| = sph_keccak.c
+		$|lib_name| = sha3
+	Create_binding($(M))
+
+section
+	export ALL_OBJECTS ALL_LIBS MLI_FILES META_PARTS META_LIBS
+	M.=
+		extends $(Map)
+		D.=
+			extends $(Map)
+			$|tiger| = 24
+			$|tiger2| = 24
+		$|digests| = $(D)
+		$|sph_file| = sph_tiger.c
+		$|lib_name| = tiger
+	Create_binding($(M))
+
+Single_file_module(name,size,cfile)=
+	export ALL_OBJECTS ALL_LIBS MLI_FILES META_PARTS META_LIBS
+	M.=
+		extends $(Map)
+		$|sph_digest| = $(name)
+		$|sph_file| = $(cfile)
+		$|lib_name| = $(name)
+	D.=
+		extends $(Map)
+	D=$(D.add $(name), $(size))
+	M=$(M.add digests, $(D))
+	Create_binding($(M))
+
+Single_file_module(md2,16,sph_md2.c)
+Single_file_module(md4,16,sph_md4.c)
+Single_file_module(md5,16,sph_md5.c)
+Single_file_module(sha1,20,sph_sha1.c)
+Single_file_module(whirlpool,64,sph_whirlpool.c)
+Single_file_module(ripemd128,16,sph_ripemd.c)
+Single_file_module(ripemd160,20,sph_ripemd.c)
+
+lib:: $(ALL_OBJECTS)
+
+.PHONY: test
+section
+	OCAMLPACKS+= unix oUnit
+	OCAML_LIBS= $(ALL_LIBS)
+	FILES=test
+	Repeat_targets($(FILES))
+	test_prog=$(OCamlProgram test, $(FILES))
+	test.opt: $(ALL_OBJECTS)
+	test.run: $(ALL_OBJECTS)
+	clean::
+		rm -f test
+	export test_prog
+
+
+getbest(n)=
+	if $(NATIVE_ENABLED)
+		return $(n).opt
+	else
+		return $(n).run
+
+getall(n)=
+	if $(NATIVE_ENABLED)
+		return $(n).opt $(n).run
+	else
+		return $(n).run
+
+
+section
+	rtest=$(getbest test)
+	qtest: $(rtest)
+		./$(rtest) -disable-long true -no-output-file -no-output-html-dir \
+       -no-output-junit-file -display false
+		$(Shell.ln-or-cp $(rtest) qtest)
+
+	.PHONY: test
+	test:: $(getall test)
+		./test.run -disable-long false
+		if $(NATIVE_ENABLED)
+			./test.opt -disable-long false
+	clean::
+		rm -f test qtest
+
+section
+	OCAML_LIBS= $(ALL_LIBS)
+	FILES=hashsum
+	hashsum_prog=$(OCamlProgram hashsum,$(FILES))
+	hashsum.opt: $(ALL_OBJECTS)
+	hashsum.run: $(ALL_OBJECTS)
+	clean::
+		rm -f hashsum
+	export hashsum_prog
+
+section
+	OCAMLPACKS+= str unix
+	OCAML_LIBS= $(ALL_LIBS)
+	FILES= run extrun
+	Repeat_targets($(FILES))
+	extrun_prog=$(OCamlProgram extrun,$(FILES))
+	extrun.opt: $(ALL_OBJECTS)
+	extrun.run: $(ALL_OBJECTS)
+	clean::
+		rm -f extrun
+	.PHONY:exttest
+	exttest: $(getall extrun)
+		./extrun.run
+		if $(NATIVE_ENABLED)
+			./extrun.opt
+	export extrun_prog
+
+section
+	META.head:
+		section
+			y=$(addprefix $(PROJNAME).,$(set $(META_LIBS)))
+			fd=$(fopen $@,w)
+			fprintln($(fd),$'version="'$(VERSION)\")
+			fprintln($(fd),$'description = "cryptographic hash functions"')
+			fprint($(fd),$'requires = "')
+			first=true
+			y.foreach(x)
+				export first
+				if $(equal $(first),true)
+					export first
+					first=false
+				else
+					fprint($(fd),$',')
+				fprint($(fd),$(x))
+			fprintln($(fd),$'"')
+			fprintln($(fd),$(EMPTY))
+			close($(fd))
+	META: META.head $(META_PARTS)
+		cat META.head $(set $(META_PARTS)) > $@
+	clean::
+		rm -f META META.head
+
+clean::
+	rm -f META
+
+section
+	ocamlfind=$(if $(USE_OCAMLFIND), $(OCAMLFIND), ocamlfind)
+	.PHONY: install
+	install: lib META
+		$(ocamlfind) install cryptohash META $(set $(ALL_OBJECTS) $(MLI_FILES))
+	.PHONY: uninstall
+	uninstall:
+		$(ocamlfind) remove cryptohash
+
+clean::
+	clean-helper()
+	rm -f oUnit*.log
+	rm -f oUnit*.cache
+
+distclean:: clean
+	rm -f *~ config.h config.status
+	rm -rf autom4te.cache
+
+.DEFAULT: all
+all:: lib qtest $(hashsum_prog) $(extrun_prog)
+

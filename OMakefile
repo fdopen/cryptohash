@@ -1,0 +1,56 @@
+.PHONY: clean lib all distclean
+
+VERSION=0.1
+PROJNAME=cryptohash
+USE_OCAMLFIND= true
+BYTE_ENABLED=	true
+
+include OMakeIncludes
+
+# omake sets OCAMLFLAGS to '-warn-error A' by default which usually
+# breaks compilation every time a new ocaml version is released
+static.=
+	export
+	if $(not $(equal $(getenv DEBUG_MY_CODE, $(EMPTY)), $(EMPTY)))
+		export
+		OCAMLFLAGS=-warn-error A
+	else
+		export
+		OCAMLFLAGS=
+
+.DEFAULT: all
+.SUBDIRS: src
+
+ConfReplace(_oasis)
+
+clean::
+	clean-helper()
+	rm -f oUnit*.log setup.data setup.log *.tar*
+
+distclean:: clean
+	rm -f *~
+	rm -f config.h
+
+.PHONY:archive
+archive:
+	section
+		r(script)=
+			T=$(shell-code $(script))
+			if $(not $(eq $(T),0))
+				exit(1)
+
+		r(rm -f _oasis src/configure)
+		r(cd src && autoconf)
+		r(omake _oasis)
+		r(oasis setup)
+		r(omake distclean)
+		ADIRNAME=$(PROJNAME)-$(VERSION)
+		TDIR=$(shell mktemp -d)
+		ADIR=$(TDIR)/$(ADIRNAME)
+		mkdir(0o755,$(ADIR))
+		r(cp -a * $(ADIR))
+		r(find $(ADIR) $''\(-name $'*.omc' -o -name '*~' -o -name '*.log' -o -name '*.lock' -o -name '.omakedb*'\) -delete'')
+		r(tar -C $(TDIR) --format=ustar --numeric-owner -cf $(ADIR).tar $(ADIRNAME))
+		r(gzip --stdout --keep --best $(ADIR).tar  > $(ROOT)/$(ADIRNAME).tar.gz)
+		r(rm -rf $(TDIR))
+		#r(xz --stdout --keep -9e $(ADIR).tar > $(ROOT)/$(ADIRNAME).tar.xz)

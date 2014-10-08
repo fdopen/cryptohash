@@ -1,0 +1,8 @@
+PRJ cryptohash
+S src
+B src
+PKG unix
+PKG oUnit
+PKG bytes
+PKG bigarray
+PKG str
