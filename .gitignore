@@ -17,6 +17,7 @@
 *.cache
 *.status
 *.omc
+/setup.ml
 /.omakedb*
 /_oasis
 /src/config.h

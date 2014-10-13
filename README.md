@@ -125,4 +125,5 @@ Cryptohash was intend as replacement for ocaml-sha. There are however small diff
 * `zero` has been removed.
 * `input` and `output` now have the same semantic as `Digest.input` and `Digest.output`
 
-For details, consult the documentation.
+If your code doesn't depend on these details, you can use the findlib
+package `cryptohash.legacy` as drop in replacement for `sha`.

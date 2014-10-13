@@ -23,7 +23,7 @@ trap "rm -rf \"${TDIR}\"" EXIT
 
 ADIR="${TDIR}/${ADIRNAME}"
 mkdir "${ADIR}"
-tar -cf- . | (cd "${ADIR}" && tar -xf- )
+tar -cf- .merlin * | (cd "${ADIR}" && tar -xf- )
 find "${ADIR}" -type f \( -name '*.omc' -o -name '*~' -o -name '*.log' -o -name '*.lock' -o -name '.omakedb*' \) -delete
 tar -C "${TDIR}" --format=ustar --numeric-owner -cf "${ADIR}.tar" "${ADIRNAME}"
 gzip --stdout --keep --best "${ADIR}.tar"  > "${ADIRNAME}.tar.gz"

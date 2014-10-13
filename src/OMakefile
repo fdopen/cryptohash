@@ -156,7 +156,7 @@ Create_meta_part(M)=
 						fprintln($(fd),$'  archive(byte, plugin) = "'$(name)$'.cma"')
 						fprintln($(fd),$'  archive(native) = "'$(name)$'.cmxa"')
 						fprintln($(fd),$'  archive(native, plugin) = "'$(name)$'.cmxs"')
-						fprintln($(fd),$'  requires = "bytes"')
+						fprintln($(fd),$'  requires = "bytes,bigarray"')
 					else
 						fprintln($(fd),$'  requires = "'$(PROJNAME).$(first)$'"')
 					fprintln($(fd),$'  exists_if = "'$(name)$'.cma"')
@@ -275,6 +275,47 @@ Single_file_module(sha1,20,sph_sha1.c)
 Single_file_module(whirlpool,64,sph_whirlpool.c)
 Single_file_module(ripemd128,16,sph_ripemd.c)
 Single_file_module(ripemd160,20,sph_ripemd.c)
+
+legacy_module(name)=
+	OCAML_LIBS= $(ALL_LIBS)
+	MLI_FILES=$(array $(MLI_FILES) $(name).mli)
+	lib=$(set $(OCamlLibrary $(name),$(name)) $(name).mli $(name).cmi $(if $(NATIVE_ENABLED), $(name).cmx, $(EMPTY) ))
+	ALL_OBJECTS=$(array $(ALL_OBJECTS) $(lib))
+	meta_name=META.legacy_$(name)
+	META_PARTS=$(array $(META_PARTS) $(meta_name))
+	$(meta_name):
+		section
+			fd=$(fopen $(meta_name), w)
+			fprintln($(fd),$'package "'legacy_$(name)$'" (')
+			fprintln($(fd),$'  version="'$(VERSION)\")
+			fprintln($(fd),$'  archive(byte) = "'$(name)$'.cma"')
+			fprintln($(fd),$'  archive(byte, plugin) = "'$(name)$'.cma"')
+			fprintln($(fd),$'  archive(native) = "'$(name)$'.cmxa"')
+			fprintln($(fd),$'  archive(native, plugin) = "'$(name)$'.cmxs"')
+			fprintln($(fd),$'  requires = "'$(PROJNAME).$(name)$'"')
+			fprintln($(fd),$')')
+			fprintln($(fd),$(EMPTY))
+			close($(fd))
+	clean::
+		rm -f $(meta_name)
+	export ALL_OBJECTS MLI_FILES META_PARTS
+
+META.legacy:
+	section
+		fd=$(fopen $@, w)
+		fprintln($(fd),$'package "legacy" (')
+		fprintln($(fd),$'  requires = "'$(PROJNAME).legacy_sha512\,$(PROJNAME).legacy_sha256\,$(PROJNAME).legacy_sha1$'"')
+		fprintln($(fd),$')')
+		fprintln($(fd),$(EMPTY))
+		close($(fd))
+clean::
+	rm -f META.legacy
+
+META_PARTS=$(array $(META_PARTS) META.legacy)
+
+legacy_module(sha1)
+legacy_module(sha256)
+legacy_module(sha512)
 
 lib:: $(ALL_OBJECTS)
 
