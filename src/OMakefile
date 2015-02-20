@@ -1,7 +1,12 @@
 OCAMLPACKS=bytes bigarray
 OCAMLFLAGS+= -g
 
-if $(lt $(OCAMLC_VERSION_MAJOR),4)
+if $(ge $(OCAMLC_VERSION_MAJOR),4)
+	OCAMLFLAGS+= -bin-annot
+	export
+
+if $(or $(lt $(OCAMLC_VERSION_MAJOR),4), \
+        $(and $(eq $(OCAMLC_VERSION_MAJOR),4), $(lt $(OCAMLC_VERSION_MINOR),1)))
 	pa_pipe.cmo.created: # to disable all magic done by omake
 		ocamlfind ocamlc -package camlp4 -pp camlp4orf -c pa_pipe.ml
 		touch $@
@@ -12,19 +17,28 @@ if $(lt $(OCAMLC_VERSION_MAJOR),4)
 	OCAMLPACKS+= camlp4
 	export
 
-.PHONY: autoconf
-autoconf: configure.ac
-	autoconf
-
 if $(equal $(OSTYPE),Win32)
-	config.h: config.h.in #configure
-		bash.exe configure "CC=$(OCAMLC_CC) $(OCAMLC_CC_CFLAGS)"
+	configure config.h.in: configure.ac
+		if $(or $(not $(file-exists configure)),$(not $(file-exists config.h.in)))
+			bash.exe autoreconf -fi
+		else
+			touch configure config.h.in
+	config.h: config.h.in configure
+		bash.exe configure CC="$(OCAMLC_CC) $(OCAMLC_CC_CFLAGS)"
 else
-	config.h: config.h.in #configure
-		./configure "CC=$(OCAMLC_CC) $(OCAMLC_CC_CFLAGS)"
+	configure config.h.in: configure.ac
+		if $(or $(not $(file-exists configure)),$(not $(file-exists config.h.in)))
+			autoreconf -fi
+		else
+			touch configure config.h.in
+	config.h: config.h.in configure
+		./configure CC="$(OCAMLC_CC) $(OCAMLC_CC_CFLAGS)"
 
 clean::
 	rm -f config.log
+
+distclean:
+ rm -f config.h config.h.in configure
 
 .SCANNER: scan-c-%: config.h
 
@@ -350,7 +364,7 @@ section
 	rtest=$(getbest test)
 	qtest: $(rtest)
 		./$(rtest) -disable-long true -no-output-file -no-output-html-dir \
-       -no-output-junit-file -display false
+		  -no-output-junit-file -display false
 		$(Shell.ln-or-cp $(rtest) qtest)
 
 	.PHONY: test
@@ -418,9 +432,11 @@ clean::
 
 section
 	ocamlfind=$(if $(USE_OCAMLFIND), $(OCAMLFIND), ocamlfind)
+	CMTIFILES=$(replacesuffixes .cmi, .cmti, $(filter %.cmi, $(ALL_OBJECTS)))
 	.PHONY: install
 	install: lib META
-		$(ocamlfind) install cryptohash META $(set $(ALL_OBJECTS) $(MLI_FILES))
+		$(ocamlfind) remove cryptohash || true
+		$(ocamlfind) install cryptohash META $(set $(ALL_OBJECTS) $(MLI_FILES)) -optional $(set $(CMTIFILES))
 	.PHONY: uninstall
 	uninstall:
 		$(ocamlfind) remove cryptohash
@@ -436,4 +452,3 @@ distclean:: clean
 
 .DEFAULT: all
 all:: lib qtest $(hashsum_prog) $(extrun_prog)
-

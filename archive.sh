@@ -15,7 +15,10 @@ cd ..
 omake _oasis
 oasis setup
 omake distclean
-
+cd src
+autoreconf -fi
+rm -rf autom4*
+cd ..
 
 ADIRNAME="${NAME}-${VERSION}"
 TDIR="$(mktemp -d)"
