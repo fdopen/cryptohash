@@ -111,16 +111,18 @@ MixedLibrary(name,mlfiles,cfiles)=
 	NATIVEDYNLIB= $(file $(name).cmxs)
 	CMXFILES = $(addsuffix .cmx, $(mlfiles))
 	CMIFILES = $(addsuffix .cmi, $(mlfiles))
+	CMOFILES = $(addsuffix .cmo, $(mlfiles))
 	MLIFILES = $(filter-exists $(addsuffix .mli, $(mlfiles)))
+	C_OBJS = $(addsuffix $(EXT_OBJ), $(cfiles))
 	OCAML_MKLIB_FLAGS= $(LDFLAGS)
-	#OCAMLFLAGS+= $(mapprefix -ccopt, $(CFLAGS))
+	OCAMLFLAGS+= $(mapprefix -ccopt, $(CFLAGS))
 	Repeat_ctargets($(cfiles))
-	$(BYTELIB): $(addsuffix .cmo, $(mlfiles)) lib$(name)$(EXT_LIB) dll$(name)$(EXT_DLL)
+	$(BYTELIB): $(addsuffix .cmo, $(mlfiles)) lib$(name)$(EXT_LIB) dll$(name)$(EXT_DLL) $(C_OBJS)
 		$(OCAMLFIND) ocamlmklib -o $(name) $(OCamlLinkSort $(addsuffix .cmo, $(mlfiles))) $(OCAML_LINK_FLAGS) $(OCAML_MKLIB_FLAGS)
-	$(NATIVELIB): $(CMXFILES) lib$(name)$(EXT_LIB) dll$(name)$(EXT_DLL)
+	$(NATIVELIB): $(CMXFILES) lib$(name)$(EXT_LIB) dll$(name)$(EXT_DLL) $(C_OBJS)
 		$(OCAMLFIND) ocamlmklib -o $(name) $(OCamlLinkSort $(addsuffix .cmx, $(mlfiles))) $(OCAML_LINK_FLAGS) $(OCAML_MKLIB_FLAGS)
 
-	lib$(name)$(EXT_LIB) dll$(name)$(EXT_DLL): $(addsuffix $(EXT_OBJ), $(cfiles))
+	lib$(name)$(EXT_LIB) dll$(name)$(EXT_DLL): $(C_OBJS)
 		$(OCAMLFIND) ocamlmklib -oc $(name) $(addsuffix $(EXT_OBJ), $(cfiles)) $(OCAML_LINK_FLAGS) $(OCAML_MKLIB_FLAGS)
 
 	$(NATIVEDYNLIB): $(NATIVELIB)
@@ -128,11 +130,25 @@ MixedLibrary(name,mlfiles,cfiles)=
 
 	return $(array $(if $(NATIVE_ENABLED), $(NATIVELIB) $(CMXFILES) \
 				$(if $(HAVE_NATIVE_DYNLINK), $(NATIVEDYNLIB))), \
-			$(if $(BYTE_ENABLED), $(BYTELIB)), \
+			$(if $(BYTE_ENABLED), $(BYTELIB) $(CMOFILES)), \
 			lib$(name)$(EXT_LIB), \
 			dll$(name)$(EXT_DLL), \
 			$(CMIFILES) $(MLIFILES) \
+		  $(C_OBJS) \
 		)
+
+MOCamlLibrary(name,files)=
+	to_add=$(addsuffix .cmi,$(files)) $(addsuffix .cmo,$(files)) $(if $(NATIVE_ENABLED),$(addsuffix .cmx,$(files)))
+	x=$(set $(OCamlLibrary $(name),$(files)) $(to_add))
+	if $(equal $(HAVE_NATIVE_DYNLINK),false)
+		return $(x)
+	elseif $(not $(equal $(filter %.cmxs, $(x)), $(EMPTY)))
+		return $(x)
+	else
+		section
+			$(name).cmxs: $(name).cmxa
+				$(OCAMLFIND) ocamlopt -shared -linkall -o $@ -I . $(OCAML_LINK_FLAGS) $<
+		return $(x) $(name).cmxs
 
 clean-helper()=
 		rm(-f $(glob *$(EXT_OBJ) *$(EXT_DLL) *$(EXT_LIB) *.cmt *.annot *.cma \

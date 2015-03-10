@@ -5,6 +5,11 @@ if $(ge $(OCAMLC_VERSION_MAJOR),4)
 	OCAMLFLAGS+= -bin-annot
 	export
 
+if $(or $(gt $(OCAMLC_VERSION_MAJOR),4), \
+        $(and $(eq $(OCAMLC_VERSION_MAJOR),4), $(ge $(OCAMLC_VERSION_MINOR),2)))
+	OCAMLFLAGS+= -safe-string
+	export
+
 if $(or $(lt $(OCAMLC_VERSION_MAJOR),4), \
         $(and $(eq $(OCAMLC_VERSION_MAJOR),4), $(lt $(OCAMLC_VERSION_MINOR),1)))
 	pa_pipe.cmo.created: # to disable all magic done by omake
@@ -293,7 +298,7 @@ Single_file_module(ripemd160,20,sph_ripemd.c)
 legacy_module(name)=
 	OCAML_LIBS= $(ALL_LIBS)
 	MLI_FILES=$(array $(MLI_FILES) $(name).mli)
-	lib=$(set $(OCamlLibrary $(name),$(name)) $(name).mli $(name).cmi $(if $(NATIVE_ENABLED), $(name).cmx, $(EMPTY) ))
+	lib=$(set $(MOCamlLibrary $(name),$(name)) $(name).mli $(name).cmi $(if $(NATIVE_ENABLED), $(name).cmx, $(EMPTY) ))
 	ALL_OBJECTS=$(array $(ALL_OBJECTS) $(lib))
 	meta_name=META.legacy_$(name)
 	META_PARTS=$(array $(META_PARTS) $(meta_name))
@@ -366,6 +371,10 @@ section
 		./$(rtest) -disable-long true -no-output-file -no-output-html-dir \
 		  -no-output-junit-file -display false
 		$(Shell.ln-or-cp $(rtest) qtest)
+	.PHONY: quick-test
+	quick-test: $(rtest)
+		./$(rtest) -disable-long true -no-output-file -no-output-html-dir \
+		  -no-output-junit-file
 
 	.PHONY: test
 	test:: $(getall test)
@@ -432,7 +441,8 @@ clean::
 
 section
 	ocamlfind=$(if $(USE_OCAMLFIND), $(OCAMLFIND), ocamlfind)
-	CMTIFILES=$(replacesuffixes .cmi, .cmti, $(filter %.cmi, $(ALL_OBJECTS)))
+	CMTIFILES=$(replacesuffixes .cma, .cmti, $(filter %.cma, $(ALL_OBJECTS)))
+	ALL_OBJECTS= $(filter-out %.o %.cmo, $(ALL_OBJECTS))
 	.PHONY: install
 	install: lib META
 		$(ocamlfind) remove cryptohash || true

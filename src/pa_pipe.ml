@@ -10,6 +10,6 @@ expr: AFTER "*"
 (* RIGHTA *)
 expr: AFTER "*"
 [RIGHTA
-  [ e1= expr; "$" ; e2 = expr -> <:expr<  $e1$ $e2$ >>]
+  [ e1= expr; "@@" ; e2 = expr -> <:expr<  $e1$ $e2$ >>]
 ];
 END

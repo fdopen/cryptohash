@@ -215,8 +215,8 @@ let run ?(env=U.environment ()) ?(stdin=`Null) ?(stderr=`Stderr) ?(stdout=`Stdou
           | `Null
           | `Stdout
           | `Stderr -> ()
-          | `Buffer b -> Buffer.add_substring b tmp_str 0 x
-          | `Fun (f: string -> unit) -> f (String.sub tmp_str 0 x)
+          | `Buffer b -> Buffer.add_substring b (Bytes.unsafe_to_string tmp_str) 0 x
+          | `Fun (f: string -> unit) -> f (Bytes.sub_string tmp_str 0 x)
         )
       in
       let to_write = match stdin with
@@ -241,7 +241,7 @@ let run ?(env=U.environment ()) ?(stdin=`Null) ?(stderr=`Stderr) ?(stdout=`Stdou
           assert (p_stdin_write.fd = fd);
           let str_len = String.length !to_write in
           assert (str_len > 0 );
-          let n_written = eintr4 U.write fd !to_write 0 str_len in
+          let n_written = eintr4 U.write fd (Bytes.unsafe_of_string !to_write) 0 str_len in
           if n_written >= str_len then (
             to_write := "";
             close_pipe p_stdin_write

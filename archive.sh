@@ -3,31 +3,49 @@
 set -e
 set -u
 
-cd "$(dirname "$0")"
-
 VERSION="$(grep '\s*VERSION=' OMakefile | sed -r 's#.*=([^\s]+)#\1#')"
 NAME="$(grep '\s*PROJNAME=' OMakefile | sed -r 's#.*=([^\s]+)#\1#')"
+pkg="${NAME}-${VERSION}"
 
-rm -f _oasis src/configure
+curdir="$(readlink -f "$0")"
+curdir="$(dirname "$curdir")"
+cd "$curdir"
+omake distclean
+
+mtmpf="$(mktemp -d)"
+trap "rm -rf \"${mtmpf}\"" EXIT
+
+if which gtar >/dev/null 2>&1 ; then
+    tar=gtar
+else
+    tar=tar
+fi
+
+stash="$(git stash create)"
+git archive --format=tar ${stash:-HEAD} | ( cd "$mtmpf" ; tar -xf- )
+
 cd src
-autoconf
+autoreconf -fi
+cp -p config.h.in configure "${mtmpf}/src"
 cd ..
 omake _oasis
 oasis setup
-omake distclean
-cd src
-autoreconf -fi
-rm -rf autom4*
-cd ..
+cp -p setup.ml _oasis "$mtmpf"
 
-ADIRNAME="${NAME}-${VERSION}"
-TDIR="$(mktemp -d)"
-trap "rm -rf \"${TDIR}\"" EXIT
+if which gfind >/dev/null 2>&1 ; then
+    find=gfind
+else
+    find=find
+fi
 
-ADIR="${TDIR}/${ADIRNAME}"
-mkdir "${ADIR}"
-tar -cf- .merlin * | (cd "${ADIR}" && tar -xf- )
-find "${ADIR}" -type f \( -name '*.omc' -o -name '*~' -o -name '*.log' -o -name '*.lock' -o -name '.omakedb*' \) -delete
-tar -C "${TDIR}" --format=ustar --numeric-owner -cf "${ADIR}.tar" "${ADIRNAME}"
-gzip --stdout --keep --best "${ADIR}.tar"  > "${ADIRNAME}.tar.gz"
-rm -rf "${TDIR}"
+cd "$mtmpf"
+
+$find . -type f ! -executable ! -perm 644 -exec chmod 644 {} \+
+$find . -type f -executable ! -perm 755 -exec chmod 755 {} \+
+$find . -type d ! -perm 755 -exec chmod 755 {} \+
+
+$tar --transform "s|^.|${pkg}|" --format=ustar --numeric-owner -cf- . | \
+    gzip -9 > "${curdir}/${pkg}.tar.gz"
+
+omake all >/dev/null 2>&1
+omake quick-test

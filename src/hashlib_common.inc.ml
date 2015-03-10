@@ -25,7 +25,7 @@ type buf = (char,
             Bigarray.int8_unsigned_elt,
             Bigarray.c_layout) Bigarray.Array1.t
 
-type t = string
+type t = Bytes.t
 
 external init:
   unit -> ctx =
@@ -36,7 +36,7 @@ external unsafe_update_substring:
   "cryptohash_ml_@digest@_update_substring" "noalloc"
 
 external unsafe_update_subbytes:
-  ctx -> string -> int -> int -> unit =
+  ctx -> Bytes.t -> int -> int -> unit =
   "cryptohash_ml_@digest@_update_substring" "noalloc"
 
 external unsafe_update_subbuffer:
@@ -63,13 +63,13 @@ external file_fast:
   string -> t =
   "cryptohash_ml_@digest@_file_fast"
 
-let to_bin = String.copy
+let to_bin = Bytes.copy
 
-let from_bin (s:string) : t =
-  let len = String.length s in
+let from_bin s : t =
+  let len = Bytes.length s in
   if len <> @size@ then
     invalid_arg "Cryptohash.from_bin";
-  String.copy s
+  Bytes.copy s
 
 let update_substring ctx s pos len =
   if pos < 0 || len < 0 || pos > String.length s - len then
@@ -139,7 +139,7 @@ let channel chan len =
       while !read > 0 do
         read := Pervasives.input chan buf 0 blocksize;
         if !read > 0 then
-          unsafe_update_substring ctx buf 0 !read
+          unsafe_update_subbytes ctx buf 0 !read
       done
     )
     else (
@@ -150,7 +150,7 @@ let channel chan len =
         if r = 0 then
           raise End_of_file;
         toread := !toread - r;
-        unsafe_update_substring ctx buf 0 r
+        unsafe_update_subbytes ctx buf 0 r
       done
     )
   );
@@ -172,7 +172,7 @@ let file name =
 let input chan =
   let b = Bytes.create @size@ in
   really_input chan b 0 @size@;
-  Bytes.unsafe_to_string b
+  b
 
 let output chan digest =
-  output_string chan digest
+  output_string chan (Bytes.unsafe_to_string digest)
