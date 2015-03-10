@@ -16,9 +16,9 @@ remove: [
 depends: [
   "base-unix" {test}
   "base-bigarray"
+  "base-bytes"
   "ocamlfind" {build}
   "omake" {build}
   "camlp4" {build}
   "ounit" {test & >= "2.0"}
-  "bytes"
 ]
