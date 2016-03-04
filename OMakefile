@@ -1,6 +1,6 @@
 .PHONY: clean lib all distclean
 
-VERSION=0.1
+VERSION=0.1.1
 PROJNAME=cryptohash
 USE_OCAMLFIND= true
 BYTE_ENABLED=	true

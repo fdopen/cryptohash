@@ -1,11 +1,11 @@
 opam-version: "1.2"
 name: "cryptohash"
-version: "0.1"
-maintainer: "andreas@ml.ignorelist.com"
-authors: [ "andreas@ml.ignorelist.com" ]
+version: "0.1.1"
+maintainer: "andreashauptmann@t-online.de"
+authors: [ "andreashauptmann@t-online.de" ]
 license: "MIT"
 homepage: "https://github.com/fdopen/cryptohash"
-dev-repo: "https://github.com/fdopen/cryptohash.git"
+dev-repo: "git://github.com/fdopen/cryptohash"
 bug-reports: "https://github.com/fdopen/cryptohash/issues"
 build: [["omake" "lib"]]
 install: [["omake" "install"]]
@@ -19,6 +19,5 @@ depends: [
   "base-bytes"
   "ocamlfind" {build}
   "omake" {build}
-  "camlp4" {build}
   "ounit" {test & >= "2.0"}
 ]

@@ -4,8 +4,8 @@ Name: cryptohash
 Version: @VERSION@
 LicenseFile: LICENSE.txt
 License: MIT
-Authors: <fdopen@ml.ignorelist.com>
-Maintainers: <fdopen@ml.ignorelist.com>
+Authors: <andreashauptmann@t-online.de>
+Maintainers: <andreashauptmann@t-online.de>
 Homepage: https://github.com/fdopen/cryptohash
 Synopsis: hash functions for OCaml
 Description:

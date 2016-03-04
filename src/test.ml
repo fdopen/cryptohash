@@ -19,6 +19,8 @@
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *)
+let ( |> ) x f = f x
+let ( @@ ) f x = f x
 
 module type DigestType =
 sig

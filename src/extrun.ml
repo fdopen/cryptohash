@@ -21,6 +21,7 @@
  *)
 
 let () = Random.self_init ()
+let ( |> ) x f = f x
 
 let () =
   if Sys.os_type <> "Win32" then

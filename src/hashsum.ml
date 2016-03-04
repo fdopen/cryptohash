@@ -19,6 +19,7 @@
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *)
+let ( |> ) x f = f x
 
 let md2 x =
   Cryptohash_md2.file_fast x |> Cryptohash_md2.to_hex

@@ -38,7 +38,6 @@ need the findlib package `cryptohash.sha512` for sha-512,
 * oUnit >= 2 (build only)
 * omake (build only)
 * ocaml >= 4
-* camlp4 (only for ocaml 3.X)
 
 ### Building the library
 

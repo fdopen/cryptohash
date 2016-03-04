@@ -10,18 +10,6 @@ if $(or $(gt $(OCAMLC_VERSION_MAJOR),4), \
 	OCAMLFLAGS+= -safe-string
 	export
 
-if $(or $(lt $(OCAMLC_VERSION_MAJOR),4), \
-        $(and $(eq $(OCAMLC_VERSION_MAJOR),4), $(lt $(OCAMLC_VERSION_MINOR),1)))
-	pa_pipe.cmo.created: # to disable all magic done by omake
-		ocamlfind ocamlc -package camlp4 -pp camlp4orf -c pa_pipe.ml
-		touch $@
-	.SCANNER: scan-ocaml-%: pa_pipe.cmo.created
-	clean::
-		rm -f pa_pipe.c*
-	OCAMLFINDFLAGS+= -syntax camlp4o -ppopt -I -ppopt . -ppopt pa_pipe.cmo
-	OCAMLPACKS+= camlp4
-	export
-
 if $(equal $(OSTYPE),Win32)
 	configure config.h.in: configure.ac
 		if $(or $(not $(file-exists configure)),$(not $(file-exists config.h.in)))
@@ -441,7 +429,7 @@ clean::
 
 section
 	ocamlfind=$(if $(USE_OCAMLFIND), $(OCAMLFIND), ocamlfind)
-	CMTIFILES=$(replacesuffixes .cma, .cmti, $(filter %.cma, $(ALL_OBJECTS)))
+	CMTIFILES=$(replacesuffixes .cmi, .cmti, $(filter %.cmi, $(ALL_OBJECTS)))
 	ALL_OBJECTS= $(filter-out %.o %.cmo, $(ALL_OBJECTS))
 	.PHONY: install
 	install: lib META
