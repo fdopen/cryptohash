@@ -63,13 +63,15 @@ external file_fast:
   string -> t =
   "cryptohash_ml_@digest@_file_fast"
 
-let to_bin s = Bytes.unsafe_to_string (Bytes.copy (Bytes.unsafe_of_string s))
-
-let from_bin s : t =
+let bin msg s : t =
   let len = String.length s in
   if len <> @size@ then
-    invalid_arg "Cryptohash.from_bin";
-  to_bin s
+    invalid_arg msg;
+  (* TODO: no copy, if support for old OCaml version is dropped *)
+  Bytes.unsafe_to_string (Bytes.copy (Bytes.unsafe_of_string s))
+
+let from_bin s = bin "Cryptohash.from_bin" s
+let to_bin s = bin "Cryptohash.to_bin" s
 
 let update_substring ctx s pos len =
   if pos < 0 || len < 0 || pos > String.length s - len then

@@ -34,8 +34,9 @@
 #ifndef UNIX_BUFFER_SIZE
 #define UNIX_BUFFER_SIZE 16384
 #endif
-#if UNIX_BUFFER_SIZE < 4096
-#define UNIX_BUFFER_SIZE 4096
+#if UNIX_BUFFER_SIZE < 16384
+#undef UNIX_BUFFER_SIZE
+#define UNIX_BUFFER_SIZE 16384
 #endif
 
 static int
@@ -133,7 +134,10 @@ cryptohash_ml_@digest@_to_hex(value s)
    const unsigned char * digest;
    char * buf;
    mlsize_t i;
-   ret=caml_alloc_string(len*2);
+   if ( len != @size@ ){
+     caml_invalid_argument(CAML_LIBRARY_NAME ".to_hex");
+   }
+   ret=caml_alloc_string( @size@ *2 );
    digest=(unsigned char *)String_val(s);
    buf=String_val(ret);
    for (i = 0; i < len; i++) {
@@ -175,13 +179,13 @@ CAMLprim value
 cryptohash_ml_@digest@_file_fast(value name)
 {
    CAMLparam1(name);
-   CAMLlocal1(ret);
+   value ret;
    const mlsize_t len = caml_string_length(name);
    char *name_dup;
    char digest[@size@];
    int x;
 
-   if ( len == 0 || (String_val(name))[0] == '\0' ){
+   if ( len == 0 || len != strlen(String_val(name)) ){
       ret=caml_copy_string("No such file or directory");
       caml_raise_sys_error(ret);
    }
@@ -219,15 +223,20 @@ cryptohash_ml_@digest@_update_subbuffer(value octx,
 {
    const size_t slen = Long_val(len);
    const void * buf = (char *)Data_bigarray_val(data) + Long_val(offset);
-   void * ctx = H_CTX(octx);
+   sph_@sph_name@_context * ctx = H_CTX(octx);
    /* TODO: find appropriate value */
-   const int block = slen > UNIX_BUFFER_SIZE ? 1 : 0 ;
-   if (block){
-      caml_enter_blocking_section();
+   if ( slen < UNIX_BUFFER_SIZE ){
+     sph_@sph_name@(ctx,buf,slen);
    }
-   sph_@sph_name@(ctx,buf,slen);
-   if ( block ){
-      caml_leave_blocking_section();
+   else {
+     sph_@sph_name@_context sctx;
+     sctx = *ctx;
+     Begin_roots2(octx,data);
+     caml_enter_blocking_section();
+     sph_@sph_name@(&sctx,buf,slen);
+     caml_leave_blocking_section();
+     memcpy(H_CTX(octx),&sctx,sizeof(sctx));
+     End_roots();
    }
    return Val_unit;
 }
