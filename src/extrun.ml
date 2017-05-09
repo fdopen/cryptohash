@@ -361,6 +361,10 @@ module Gpg = struct
     ["--no-tty";"--batch";"--print-md";"sha256"],sha256;
     ["--no-tty";"--batch";"--print-md";"sha384"],sha384;
     ["--no-tty";"--batch";"--print-md";"sha512"],sha512;
+    ["--no-tty";"--batch";"--print-md";"sha3-224"],sha3_224;
+    ["--no-tty";"--batch";"--print-md";"sha3-256"],sha3_256;
+    ["--no-tty";"--batch";"--print-md";"sha3-384"],sha3_384;
+    ["--no-tty";"--batch";"--print-md";"sha3-512"],sha3_512;
   ]
 end
 
