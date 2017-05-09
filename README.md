@@ -2,6 +2,9 @@
 
 Cryptohash provides OCaml bindings to various cryptographic hash functions.
 
+[![Travis build Status](https://travis-ci.org/fdopen/cryptohash.svg?branch=master)](https://travis-ci.org/fdopen/cryptohash)
+[![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/github/fdopen/cryptohash?svg=true)](https://ci.appveyor.com/project/fdopen/cryptohash)
+
 The following functions are supported:
 
 * SHA-1
