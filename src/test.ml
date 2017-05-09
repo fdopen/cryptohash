@@ -66,7 +66,7 @@ sig
 end
 
 type 'a catch_exn =
-  | Ok of 'a
+  | COk of 'a
   | Exn of exn
 
 let () = Random.self_init ()
@@ -160,17 +160,17 @@ let with_tempfile ~f arg =
     );
   in
   let x =
-    try Ok(f ~close ~fln ~ch arg)
+    try COk(f ~close ~fln ~ch arg)
     with x -> Exn(x)
   in
   match x with
-  | Ok x -> clean false; x
+  | COk x -> clean false; x
   | Exn x -> clean true; raise x
 
 let with_bin_file ~f ~fln arg =
   let ch = open_in_bin fln in
-  match (try Ok(f ~ch arg) with x -> Exn(x)) with
-  | Ok x -> close_in ch; x
+  match (try COk(f ~ch arg) with x -> Exn(x)) with
+  | COk x -> close_in ch; x
   | Exn x -> close_in_noerr ch; raise x
 
 

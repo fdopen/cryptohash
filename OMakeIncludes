@@ -1,3 +1,12 @@
+GetVarEnv(name)=
+	try
+		value $(getvar $(name))
+	default
+		try
+			value $(getenv $(name))
+		default
+			value $(EMPTY)
+
 String_subst(from, to, s) =
    # Create a channel from a string
    inx = $(open-in-string $s)
@@ -28,11 +37,13 @@ ConfReplace(file)=
 			close($(stdout))
 			if $(not $(equal $(OSTYPE), Win32))
 				chmod(0444 $(file))
+	clean::
+		rm -f $(file)
 
 Repeat_targets(t)=
 	foreach(f, $(t))
-		$(f).cmo:
 		$(f).cmi:
+		$(f).cmo:
 		$(f).cmx:
 		$(f)$(EXT_OBJ):
 
@@ -52,7 +63,7 @@ CreateDoc(name,folder,files)=
 	cmifiles = $(addsuffix .cmi, $(removesuffix $(mlifiles)))
 	if $(USE_OCAMLFIND)	
 		$(name).idoc: $(mlifiles) $(cmifiles) /.PHONY/OCamlGeneratedFilesTarget
-			$(OCAMLFIND) ocamldoc -dump $(name).idoc -stars \
+			$(OCAMLFIND) ocamldoc $(OCAMLFINDFLAGS) -dump $(name).idoc -stars \
 				$(PREFIXED_OCAMLINCLUDES) -package "$(OCAMLPACKS)" \
 				$(mlifiles)
 	else
@@ -61,8 +72,7 @@ CreateDoc(name,folder,files)=
 				$(PREFIXED_OCAMLINCLUDES) $(mlifiles)
 	doc:: $(cmifiles) $(name).idoc
 		mkdir(-m 0755 -p $(folder))
-		rm(-f $(folder)/*)
-		$(OCAMLFIND) ocamldoc -d html -stars -t $(capitalize $(name)) -html $(mapprefix -load, $(name).idoc)
+		$(OCAMLFIND) ocamldoc $(OCAMLDOCFLAGS) -d html -stars -html $(mapprefix -load, $(name).idoc)
 	clean::
 		rm(-r -f $(folder))
 		rm(-f $(name).idoc)		
@@ -92,7 +102,7 @@ static. =
 		x=$(split .,$(OCAMLC_VERSION))
 		OCAMLC_VERSION_MAJOR=$(int $(x.nth 0))
 		OCAMLC_VERSION_MINOR=$(int $(x.nth 1))
-		HAVE_NATIVE_DYNLINK=$(eq 0,$(shell-code ocamlfind query -predicates native dynlink))
+		HAVE_NATIVE_DYNLINK=$(and $(NATIVE_ENABLED), $(eq 0,$(shell-code ocamlfind query -predicates native dynlink)))
 		export OCAMLLIB
 		export OCAMLC_VERSION
 		export OCAMLC_CC
@@ -107,38 +117,37 @@ MixedLibrary(name,mlfiles,cfiles)=
 	CC= $(OCAMLC_CC)
 	CFLAGS= $(OCAMLC_CC_CFLAGS) -I$(OCAMLLIB) $(CFLAGS)
 	BYTELIB   = $(file $(name).cma)
-	NATIVELIB = $(file $(name).cmxa) $(file $(name).a)
+	NATIVELIB = $(file $(name).cmxa) $(file $(name)$(EXT_LIB))
 	NATIVEDYNLIB= $(file $(name).cmxs)
 	CMXFILES = $(addsuffix .cmx, $(mlfiles))
 	CMIFILES = $(addsuffix .cmi, $(mlfiles))
 	CMOFILES = $(addsuffix .cmo, $(mlfiles))
 	MLIFILES = $(filter-exists $(addsuffix .mli, $(mlfiles)))
 	C_OBJS = $(addsuffix $(EXT_OBJ), $(cfiles))
-	OCAML_MKLIB_FLAGS= $(LDFLAGS)
-	OCAMLFLAGS+= $(mapprefix -ccopt, $(CFLAGS))
+	LDOPT_LDFLAGS=$(mapprefix -ldopt, $(LDFLAGS))
+	CCLIB_LDFLAGS=$(mapprefix -cclib, $(LDFLAGS))
 	Repeat_ctargets($(cfiles))
-	$(BYTELIB): $(addsuffix .cmo, $(mlfiles)) lib$(name)$(EXT_LIB) dll$(name)$(EXT_DLL) $(C_OBJS)
-		$(OCAMLFIND) ocamlmklib -o $(name) $(OCamlLinkSort $(addsuffix .cmo, $(mlfiles))) $(OCAML_LINK_FLAGS) $(OCAML_MKLIB_FLAGS)
-	$(NATIVELIB): $(CMXFILES) lib$(name)$(EXT_LIB) dll$(name)$(EXT_DLL) $(C_OBJS)
-		$(OCAMLFIND) ocamlmklib -o $(name) $(OCamlLinkSort $(addsuffix .cmx, $(mlfiles))) $(OCAML_LINK_FLAGS) $(OCAML_MKLIB_FLAGS)
-
 	lib$(name)$(EXT_LIB) dll$(name)$(EXT_DLL): $(C_OBJS)
-		$(OCAMLFIND) ocamlmklib -oc $(name) $(addsuffix $(EXT_OBJ), $(cfiles)) $(OCAML_LINK_FLAGS) $(OCAML_MKLIB_FLAGS)
+		$(OCAMLFIND) ocamlmklib -o $(name) $(C_OBJS) $(LDOPT_LDFLAGS)
+
+	$(BYTELIB): dll$(name)$(EXT_DLL) $(CMOFILES)
+		$(OCAMLFIND) ocamlc -a -dllib -l$(name) -cclib -l$(name) $(OCAML_LINK_FLAGS) $(CCLIB_LDFLAGS) \
+			$(OCamlLinkSort $(CMOFILES)) -o $(BYTELIB)
+
+	$(NATIVELIB): lib$(name)$(EXT_LIB) $(CMXFILES)
+		$(OCAMLFIND) ocamlopt -a -cclib -l$(name) $(OCAML_LINK_FLAGS) $(CCLIB_LDFLAGS)  $(OCamlLinkSort $(CMXFILES)) \
+			-o  $(nth 0, $(NATIVELIB))
 
 	$(NATIVEDYNLIB): $(NATIVELIB)
 		$(OCAMLFIND) ocamlopt -shared -o $@ -I . $(OCAML_LINK_FLAGS) $<
 
 	return $(array $(if $(NATIVE_ENABLED), $(NATIVELIB) $(CMXFILES) \
-				$(if $(HAVE_NATIVE_DYNLINK), $(NATIVEDYNLIB))), \
-			$(if $(BYTE_ENABLED), $(BYTELIB) $(CMOFILES)), \
-			lib$(name)$(EXT_LIB), \
-			dll$(name)$(EXT_DLL), \
-			$(CMIFILES) $(MLIFILES) \
-		  $(C_OBJS) \
-		)
+					$(if $(HAVE_NATIVE_DYNLINK), $(NATIVEDYNLIB))) \
+				$(if $(BYTE_ENABLED), $(BYTELIB) $(CMOFILES) dll$(name)$(EXT_DLL)) \
+				lib$(name)$(EXT_LIB) $(CMIFILES) $(MLIFILES) $(C_OBJS) )
 
 MOCamlLibrary(name,files)=
-	to_add=$(addsuffix .cmi,$(files)) $(addsuffix .cmo,$(files)) $(if $(NATIVE_ENABLED),$(addsuffix .cmx,$(files)))
+	to_add=$(addsuffix .cmi,$(files)) $(if $(BYTE_ENABLED), $(addsuffix .cmo,$(files))) $(if $(NATIVE_ENABLED),$(addsuffix .cmx,$(files)))
 	x=$(set $(OCamlLibrary $(name),$(files)) $(to_add))
 	if $(equal $(HAVE_NATIVE_DYNLINK),false)
 		return $(x)
@@ -152,4 +161,107 @@ MOCamlLibrary(name,files)=
 
 clean-helper()=
 		rm(-f $(glob *$(EXT_OBJ) *$(EXT_DLL) *$(EXT_LIB) *.cmt *.annot *.cma \
-	     *.cmi *.cmti *.cmxa *.cmx *.cmxs *.cmo *.opt *.run *.exe))
+	     *.cmi *.cmti *.cmxa *.cmx *.cmxs *.cmo *.opt *.run *.exe *.log *.cache *.core core))
+
+clean-helper-keep(to_keep)=
+	rm(-f $(filter-out $(to_keep), $(glob *$(EXT_OBJ) *$(EXT_DLL) *$(EXT_LIB) *.cmt *.annot *.cma \
+	   	  *.cmi *.cmti *.cmxa *.cmx *.cmxs *.cmo *.opt *.run *.exe *.log *.cache *.core core)))
+
+
+# useful functions from camlspotter
+where1(com) =
+  WHERE = $(where $(prog))
+  if $(WHERE)
+    value $(nth 0, $(WHERE))
+  else
+    value
+
+Check_prog_in_path(prog) =
+   ConfMsgChecking(for $(prog))
+   WHERE = $(where1 $(prog))
+   if $(WHERE)
+      ConfMsgResult(found $(WHERE))
+      return $(WHERE)
+   else
+      ConfMsgResult(FAILED - no $(prog) found)
+      return false
+
+pkg_config(name, libname) =
+  ConfMsgChecking(for $(libname) by pkg-config)
+  if $(and $(defined this.PATH_PKG_CONFIG), $(equal 0, $(shell-code $(PATH_PKG_CONFIG) $(libname))))
+    # this is required since it is called in .STATIC
+    setvar(this.LDFLAGS_$(name), $(shell $(PATH_PKG_CONFIG) --libs $(libname)))
+    setvar(this.CFLAGS_$(name), $(shell $(PATH_PKG_CONFIG) --cflags $(libname)))
+    setvar(this.SUPPORT_$(uppercase $(name)), true)
+    setvar(this.HAVE_$(uppercase $(name)), true)
+    ConfMsgResult(found)
+    export
+    value true
+  else 
+    ConfMsgResult(failed $(PATH_PKG_CONFIG) $(libname))
+    value false
+  export
+
+pkg_config_version(libname) =
+  value $(shell $(PATH_PKG_CONFIG) $(libname) --modversion)
+
+pkg_config_between_vers(name, libname, min_ver, too_high_ver) =
+  if $(pkg_config $(name), $(libname))
+    ConfMsgChecking($(libname): $(min_ver) <= version < $(too_high_ver))
+    ver=$(pkg_config_version $(libname)) 
+    if $(and $(le $(cmp-versions $(min_ver), $(ver)), 0), $(lt $(cmp-versions $(ver), $(too_high_ver)), 0))
+      ConfMsgResult($(ver) ... yes)
+      value true
+      export
+    else
+      ConfMsgResult($(ver) ... no)
+      value false # do not export
+    export
+  else
+    value false
+  export
+
+Install_helper(name, OBJFILES, OPT_OBJFILES)=
+	MLIS=
+		t1=$(replacesuffixes .cmo .cma .cmx .cmxa .cmxs .cmti $(EXT_OBJ) $(EXT_LIB), .mli .mli .mli .mli .mli .mli .mli .mli, $(OBJFILES) $(OPT_OBJFILES))
+		t2=$(set $(filter %.mli, $(t1)))
+		value $(filter-exists $(t2))
+	IFILES= $(set $(filter-out %$(EXT_OBJ) %.cmo, $(OBJFILES)) $(MLIS) )
+	OPT_IFILES=$(set $(filter-out %$(EXT_OBJ) %.cmo, $(OPT_OBJFILES) ))
+	CMTIFILES=$(set $(replacesuffixes .cmo, .cmti, $(filter %.cmo, $(OBJFILES) $(OPT_OBJFILES))))
+	install:: META $(OBJFILES)
+		$(OCAMLFIND) remove $(name) || true
+		$(OCAMLFIND) install -patch-version $(VERSION) $(name) META $(IFILES) -optional $(CMTIFILES) $(OPT_IFILES)
+	uninstall::
+		$(OCAMLFIND) remove $(name)
+
+NULL_DEVICE=
+	if $(not $(equal $(OSTYPE), Win32))
+		value /dev/null
+	else
+		value NUL
+
+CPPO_FILES(t)=
+	LocalOCamlGeneratedFiles($(t))
+	foreach(f, $(t))
+		$(f): $(removesuffix $(f)).cppo$(suffix $(f))
+			section
+				if $(and $(not $(equal $(OSTYPE), Win32)),$(file-exists $@))
+					chmod(0666 $@)
+				cppo -V $"OCAML:$(OCAMLC_VERSION)" -o $@ $<
+				if $(not $(equal $(OSTYPE), Win32))
+					chmod(0400 $@)
+		clean::
+			rm -f $(f)
+
+CPPO_FILES_I(t,incs)=
+	LocalOCamlGeneratedFiles($(t))
+	foreach(f, $(t))
+		$(f): $(removesuffix $(f)).cppo$(suffix $(f)) $(incs)
+			section
+				rm(-f $@)
+				cppo -V $"OCAML:$(OCAMLC_VERSION)" -o $@ $<
+				if $(not $(equal $(OSTYPE), Win32))
+					chmod(0400 $@)
+		clean::
+			rm -f $(f)

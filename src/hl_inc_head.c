@@ -53,6 +53,11 @@ extern int errno;
 
 #include "@include@"
 
+#if !HAVE_SSIZE_T && defined(_MSC_VER)
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#endif
+
 #ifdef TEMP_FAILURE_RETRY
 #define OPEN(a,b) TEMP_FAILURE_RETRY(open((a),(b)))
 #define READ(a,b,c) TEMP_FAILURE_RETRY(read((a),(b),(c)))

@@ -1,6 +1,6 @@
 opam-version: "1.2"
 name: "cryptohash"
-version: "0.1.1"
+version: "0.1.2"
 maintainer: "andreashauptmann@t-online.de"
 authors: [ "andreashauptmann@t-online.de" ]
 license: "MIT"

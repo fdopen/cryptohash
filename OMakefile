@@ -1,6 +1,6 @@
 .PHONY: clean lib all distclean
 
-VERSION=0.1.1
+VERSION=0.1.2
 PROJNAME=cryptohash
 USE_OCAMLFIND= true
 BYTE_ENABLED=	true
@@ -13,10 +13,10 @@ static.=
 	export
 	if $(not $(equal $(getenv DEBUG_MY_CODE, $(EMPTY)), $(EMPTY)))
 		export
-		OCAMLFLAGS= -w A
+		OCAMLFLAGS= -strict-sequence -principal -w A-3-4 -warn-error +1..46-3-4-45
 	else
 		export
-		OCAMLFLAGS=
+		OCAMLFLAGS= -warn-error +1..46-3-4
 
 .DEFAULT: all
 .SUBDIRS: src

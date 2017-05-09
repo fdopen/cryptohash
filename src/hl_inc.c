@@ -218,7 +218,7 @@ cryptohash_ml_@digest@_update_subbuffer(value octx,
                                         value len)
 {
    const size_t slen = Long_val(len);
-   const void * buf = Data_bigarray_val(data) + Long_val(offset);
+   const void * buf = (char *)Data_bigarray_val(data) + Long_val(offset);
    void * ctx = H_CTX(octx);
    /* TODO: find appropriate value */
    const int block = slen > UNIX_BUFFER_SIZE ? 1 : 0 ;

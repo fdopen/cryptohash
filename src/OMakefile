@@ -186,12 +186,9 @@ Create_binding(M)=
 		#META_LIBS+= $(n.nth 1)
 		c_files=$(Create_c_files $(M))
 		libname=$(M.find lib_name)
-		CFLAGS_ADD=
-			if $(or $(equal $(OCAMLC_SYSTEM),win32),$(equal $(OCAMLC_SYSTEM), win64))
-				value /O2
-			else
-				value -Wno-unused-function -O3 #3 -g
-		CFLAGS+= $(CFLAGS_ADD)
+		if $(not $(or $(equal $(OCAMLC_SYSTEM),win32),$(equal $(OCAMLC_SYSTEM), win64)))
+			export
+			CFLAGS+= -Wno-unused-function -O3
 		Repeat_targets($(ml_files))
 		nobjs=$(MixedLibrary cryptohash_$(libname),$(ml_files),$(c_files))
 		ALL_OBJECTS=$(array $(ALL_OBJECTS) $(nobjs))
