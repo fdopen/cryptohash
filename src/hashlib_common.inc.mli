@@ -6,8 +6,8 @@ type buf = (char,
             Bigarray.int8_unsigned_elt,
             Bigarray.c_layout) Bigarray.Array1.t
 
-(** digest type - opaque *)
-type t
+(** digest type *)
+type t = string
 
 (** Create a new context *)
 val init: unit -> ctx
@@ -82,7 +82,7 @@ val output : out_channel -> t -> unit
 val input : in_channel -> t
 
 (** return a binary representation of the given digest *)
-val to_bin : t -> Bytes.t
+val to_bin : t -> string
 
 (** return a printable hexadecimal representation of the given digest *)
 val to_hex : t -> string
@@ -94,4 +94,4 @@ val from_hex: string -> t
 (** reversal of to_bin.
     Raises [Invalid_argument], if the parameter not a valid binary.
     representation *)
-val from_bin: Bytes.t -> t
+val from_bin: string -> t

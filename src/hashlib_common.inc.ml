@@ -25,7 +25,7 @@ type buf = (char,
             Bigarray.int8_unsigned_elt,
             Bigarray.c_layout) Bigarray.Array1.t
 
-type t = Bytes.t
+type t = string
 
 external init:
   unit -> ctx =
@@ -63,13 +63,13 @@ external file_fast:
   string -> t =
   "cryptohash_ml_@digest@_file_fast"
 
-let to_bin = Bytes.copy
+let to_bin s = Bytes.unsafe_to_string (Bytes.copy (Bytes.unsafe_of_string s))
 
 let from_bin s : t =
-  let len = Bytes.length s in
+  let len = String.length s in
   if len <> @size@ then
     invalid_arg "Cryptohash.from_bin";
-  Bytes.copy s
+  to_bin s
 
 let update_substring ctx s pos len =
   if pos < 0 || len < 0 || pos > String.length s - len then
@@ -172,7 +172,7 @@ let file name =
 let input chan =
   let b = Bytes.create @size@ in
   really_input chan b 0 @size@;
-  b
+  Bytes.unsafe_to_string b
 
 let output chan digest =
-  output_string chan (Bytes.unsafe_to_string digest)
+  output_string chan digest

@@ -44,10 +44,10 @@ sig
   val file_fast : string -> t
   val output : out_channel -> t -> unit
   val input : in_channel -> t
-  val to_bin : t -> Bytes.t
+  val to_bin : t -> string
   val to_hex : t -> string
   val from_hex: string -> t
-  val from_bin: Bytes.t -> t
+  val from_bin: string -> t
 end
 
 module type DigestInfo =
@@ -57,10 +57,10 @@ sig
   val v2: string  (* hash of vec2 *)
   val v3: string
   val v4: string
-  val b_null: Bytes.t (* binary representation of v_null *)
-  val b2: Bytes.t
-  val b3: Bytes.t
-  val b4: Bytes.t
+  val b_null: string (* binary representation of v_null *)
+  val b2: string
+  val b3: string
+  val b4: string
   val million: string (* hash of a million 'a' *)
   val delirious: string (* hash of string_delirious 16_777_216 times *)
 end
@@ -668,7 +668,7 @@ struct
 end
 
 (* test data from non-nist hashes are from rhash and jacksum *)
-let b = Bytes.of_string
+let b x = x (*Bytes.of_string*)
 module Md2_data = struct
   let name = "md2"
   let v_null = "8350e5a3e24c153df2275c9f80692773"
